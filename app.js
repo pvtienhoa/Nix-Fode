@@ -3,6 +3,7 @@ var quickfix = require('node-quickfix');
 var path = require('path');
 var events = require('events');
 var common = require('./support/common.js');
+var msgutils = require('./support/msgutils.js');
 var initiator = quickfix.initiator;
 
 var options = {
@@ -55,6 +56,9 @@ const showLog = (obj) => {
         notify.showNotify(`Message: `);
         console.log(obj.message);
     }
+    if(obj.message.header[35] = 'W') {
+        debugger;
+    }
 };
 
 const onCreateHandler = (obj) => {
@@ -91,7 +95,8 @@ const fromAdminHandler = (obj) => {
 
 const fromAppHandler = (obj) => {
     notify.showNotify(`fromApp event Emitted`);
-    showLog(obj);
+    //showLog(obj);
+    msgutils.showParse(obj.message);
 };
 
 const sendMarktRequestData = () => {
