@@ -1,21 +1,31 @@
-const notify = require('./support/notify.js');
-var quickfix = require('node-quickfix');
-var path = require('path');
-var events = require('events');
-var common = require('./support/common.js');
-var msgutils = require('./support/msgutils.js');
-var initiator = quickfix.initiator;
+const quickfix = require('node-quickfix');
+const path = require('path');
+const events = require('events');
+const initiator = quickfix.initiator;
+const mariadb = require('mariadb/callback');
 
-var options = {
-    credentials: {
-        username: "D103289979",
-        password: "5020"
-    },
-    ssl: false,
-    propertiesFile: path.join(__dirname, '/support/initiator.fxcm.properties')
-    //propertiesFile: path.join(__dirname, '/support/initiator.fiximulator.properties')
-    // propertiesFile: path.join(__dirname, '/support/initiator.properties')
-};
+const common = require('./support/common.js');
+const msgutils = require('./support/msgutils.js');
+const SpreadAvg = require('./support/SpreadAvg.js');
+const DBConnector = require('./support/dbconnector.js');
+
+const optionPath = path.join(__dirname, '/support/config.json');
+debugger
+const options = common.loadOptions(optionPath);
+const foptions = common.loadFixOptions(options);
+
+const spreadAvg = [];
+
+const dbConn = new DBConnector(options);
+const emitter = new events.EventEmitter();
+
+const connection = mariadb.createConnection({
+    // host: options.localhost,
+    socketPath: options.DBSocketPath,
+    user: options.DBUserName,
+    password: options.DBPassword,
+    database: options.DBDatabase
+});
 
 // extend prototype
 function inherits(target, source) {
@@ -48,89 +58,50 @@ var fixClient = new initiator(
         fromApp: function (message, sessionID) {
             fixClient.emit('fromApp', common.stats(fixClient, sessionID, message));
         }
-    }, options);
+    }, foptions);
 
 const showLog = (obj) => {
     common.printStats(fixClient);
     if (obj.message) {
-        notify.showNotify(`Message: `);
+        common.showNotify(`Message: `);
         console.log(obj.message);
     }
-    if(obj.message.header[35] = 'W') {
-        debugger;
+    if (obj.message.groups) {
+        common.showNotify(`Groups: `);
+        obj.message.groups[268].forEach(g => {
+            console.log(g);
+        });
     }
 };
 
 const onCreateHandler = (obj) => {
-    notify.showNotify(`onCreate event Emitted`);
-    showLog(obj);
+    //common.showNotify(`onCreate event Emitted`);
+    //showLog(obj);
 };
-
 const onLogonHandler = (obj) => {
-    notify.showNotify(`onLogon event Emitted`);
+    common.showNotify(`onLogon event Emitted`);
     // showLog(obj);
     sendMarktRequestData();
 };
-
 const onLogoutHandler = (obj) => {
-    notify.showNotify(`onLogout event Emitted`);
+    //common.showNotify(`onLogout event Emitted`);
     //showLog(obj);
 };
-
 const onLogonAttempHandler = (obj) => {
-    notify.showNotify(`onLogon event Emitted`);
+    //common.showNotify(`onLogon event Emitted`);
     //showLog(obj);
 };
-
 const toAdminHandler = (obj) => {
     //obj.message.header[57] = 'U100D1';  // Set Tag 57 - TargetSubID on hearbeat msg
-    notify.showNotify(`toAdmin event Emitted`);
-    showLog(obj);
-};
-
-const fromAdminHandler = (obj) => {
-    notify.showNotify(`fromAdmin event Emitted`);
-    showLog(obj);
-};
-
-const fromAppHandler = (obj) => {
-    notify.showNotify(`fromApp event Emitted`);
+    //common.showNotify(`toAdmin event Emitted`);
     //showLog(obj);
-    msgutils.showParse(obj.message);
 };
-
-const sendMarktRequestData = () => {
-    var mrd = {
-        header: {
-            8: 'FIX.4.4',
-            35: 'V',
-            49: 'MD_D103289979_client1',
-            56: 'FXCM',
-            57: 'U100D1'
-        },
-        tags: {
-            262: 'EUR/USD_Request', //MDReqID
-            263: 1,                 //SubscriptionRequestType - 1:SNAPSHOT PLUS UPDATES
-            264: 0,                 //MarketDepth
-            265: 0,                 //MDUpdateType - 0: FULL REFRESH - 1:INSCREMENTAL
-        },
-        groups: [{
-            'index': 146,           //NoRelatedSym
-            'delim': 55,
-            'entries': [{ 55: 'EUR/USD' }]   //MDEntryType - 1: OFFER - 0: BID
-        },
-        {
-            'index': 267,
-            'delim': 269,
-            'entries': [{ 269: 0, 269: 1 }]   //MDEntryType - 1: OFFER - 0: BID
-        }]
-
-    };
-
-    fixClient.send(mrd, function () {
-        notify.showNotify("Market Data Request sent!");
-        common.printStats(fixClient);
-    });
+const fromAdminHandler = (obj) => {
+    //common.showNotify(`fromAdmin event Emitted`);
+    //showLog(obj);
+};
+const fromAppHandler = (obj) => {
+    if (obj.message) receiveMessage(obj.message);
 };
 
 fixClient.on('onCreate', onCreateHandler);
@@ -140,9 +111,188 @@ fixClient.on('onLogonAttempt', onLogonAttempHandler);
 fixClient.on('toAdmin', toAdminHandler);
 fixClient.on('fromAdmin', fromAdminHandler);
 fixClient.on('fromApp', fromAppHandler);
-debugger
+
+const receiveMessage = (message) => {
+    if (message.header[35] !== 'W' && message.header[35] !== 'X') {
+        common.showError('Not a "W" or "X" message!');
+        return;
+    }
+    //msgutils.showParse(obj.message);
+    var p = msgutils.parse(message);
+    emitter.emit('PriceReceived', p);
+
+    var a = spreadAvg.filter(avg => avg.symbol == p.Symbol)[0];
+    //console.log(a.symbol+ '=='+ p.Symbol);
+    if (a) a.addSum(p.Spread);
+};
+
+const recordAvg = () => {
+    dbConn.insertAvg(spreadAvg,options);    
+    common.showNotify('Average Spreads have been recorded');
+    // connection.connect(err => {
+    //     if (err) {
+    //         common.showError("not connected due to error: " + err);
+    //     } else {
+    //         common.showNotify("connected ! connection id is " + connection.threadId);
+    //         spreadAvg.forEach(avg => {
+    //             avg.calculate();
+    //             if (avg.avgSpread != 0) {
+    //                 connection.query("INSERT INTO AverageSpreads(TimeStamp, Duration, BrokerName, Symbol, AvgSpread) VALUES (?, ?, ?, ?, ?)", [msgutils.getCurrentTimeStamp(), options.AvgTerm, options.FBrokerName, avg.symbol, avg.avgSpread], (err, res) => {
+    //                     if (err) {
+    //                         common.showError("cannot query due to error:: " + err);
+    //                         return;
+    //                     }
+    //                     //console.log(res); // { affectedRows: 1, insertId: 1, warningStatus: 0 }
+    //                 });
+    //             }
+    //             // common.showNotify('This record will be insert into db');
+    //             // console.log('Symbol: ' + avg.symbol);
+    //             // console.log('duration: ' + avg.duration);
+    //             // console.log('brokerName: ' + avg.brokerName);
+    //             // console.log('avgSpread: ' + avg.avgSpread);
+    //             // console.log('sum: ' + avg.sum);
+    //             // console.log('count: ' + avg.count);
+    //             avg.reset();
+    //         });
+    //     };
+        
+    // });
+
+};
+
+const sendMarktRequestData = () => {
+    //Create request message template
+    var mrd = {
+        header: {
+            8: options.FMsgType,
+            35: 'V',
+            49: options.FSenderID,
+            56: options.FTargetID,
+            57: options.FTargetSubID
+        },
+        tags: {
+            262: options.BrokerName, //MDReqID
+            263: 1,                 //SubscriptionRequestType - 1:SNAPSHOT PLUS UPDATES
+            264: 0,                 //MarketDepth
+            265: 1,                 //MDUpdateType - 0: FULL REFRESH - 1:INSCREMENTAL
+        },
+        groups: [{
+            'index': 146,           //NoRelatedSym
+            'delim': 55,
+            'entries': []   //MDEntryType - 1: OFFER - 0: BID { 55: 'EUR/USD' }
+        },
+        {
+            'index': 267,
+            'delim': 269,
+            'entries': [{ 269: 0 }, { 269: 1 }]   //MDEntryType - 1: OFFER - 0: BID
+        }]
+
+    };
+
+    //Query Rows from Symbol tables
+    let rows = dbConn.querySymbols();
+
+    //Push Symbols into message template
+    if (rows.length > 0) {
+        rows.forEach(row => {
+            mrd.groups[0].entries.push({ 55: row.currencypairname });
+            var a = new SpreadAvg(options.FBrokerName, row.currencypairname, row.Digit);
+            spreadAvg.push(a);
+            //console.log(a);
+        });
+    }
+    //Send message
+    fixClient.send(mrd, function () {
+        common.showNotify("Market Data Request sent!");
+        //common.printStats(fixClient);
+    });
+
+    // connection.connect(err => {
+    //     if (err) {
+    //         common.showError("not connected due to error: " + err);
+    //     } else {
+    //         common.showNotify("connected for load symbols! connection id is " + connection.threadId);
+    //         connection.query("Select * From Symbols Where LiveQuotes = '1';", (err, res) => {
+    //             const rows = res;
+    //             if (rows.length > 0) {
+    //                 rows.forEach(row => {
+    //                     mrd.groups[0].entries.push({ 55: row.currencypairname });
+    //                     var a = new SpreadAvg(options.FBrokerName, row.currencypairname, row.Digit);
+    //                     spreadAvg.push(a);
+    //                     //console.log(a);
+    //                 });
+    //             }
+
+    //             fixClient.send(mrd, function () {
+    //                 common.showNotify("Market Data Request sent!");
+    //                 //common.printStats(fixClient);
+    //             });
+
+    //             if (err) {
+    //                 common.showError("cannot query due to error:: " + err);
+    //                 return;
+    //             }
+    //         });
+
+    //     }
+    // });
+
+};
+
+//Main
 fixClient.start(() => {
-    notify.showNotify("FIX Initiator Started");
+    common.showNotify("FIX Initiator Started");
+    //Start connector
+    dbConn.createPool();
+
+    //set timer for record Average Spread
+    setInterval(() => {
+        recordAvg();
+    }, options.AvgTerm);
+
+    //Set listner on Price Received
+    emitter.on('PriceReceived', (msgObj) => {
+        dbConn.updateLiveQuotes(msgObj);
+    });
     process.stdin.resume();
+    // connection.connect(err => {
+    //     if (err) {
+    //         common.showError("not connected due to error: " + err);
+    //     } else {
+    //         setInterval(() => {
+    //             recordAvg();
+    //         }, options.AvgTerm);
+    //         common.showNotify("connected ! connection id is " + connection.threadId);
+    //         //Listen to event
+    //         emitter.on('PriceReceived', (msgObj) => {
+    //             connection.query(`
+    //                 UPDATE LiveQuotesLD SET 
+    //                     TimeStamp = ?, 
+    //                     BrokerName = ?, 
+    //                     Bid = ?, 
+    //                     Ask = ?, 
+    //                     Spread = ?  
+    //                 WHERE Symbol = ?;`,
+    //                 [(msgObj.TimeStamp) ? msgObj.TimeStamp : 'TimeStamp',
+    //                 (msgObj.BrokerName) ? msgObj.BrokerName : 'BrokerName',
+    //                 (msgObj.Bid) ? msgObj.Bid : 'Bid',
+    //                 (msgObj.Ask) ? msgObj.Ask : 'Ask',
+    //                 (msgObj.Spread) ? msgObj.Spread : 'Spread',
+    //                 msgObj.Symbol], (err, res) => {
+    //                     if (err) {
+    //                         common.showError("not inserted due to error: " + err);
+    //                         process.exit();
+    //                         return;
+    //                     }
+    //                     //console.log(res); // { affectedRows: 1, insertId: 1, warningStatus: 0 }
+    //                 });
+    //             //console.clear();
+    //             //common.showNotify('Price has been updated!');
+    //             //console.log(msgObj);
+    //         });
+    //         process.stdin.resume();
+    //     }
+    // });
 });
+
 

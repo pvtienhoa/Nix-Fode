@@ -1,0 +1,18 @@
+{
+    "FHost"     : "fixdemo.fxcorporate.com",
+    "FPort"     : "9001",
+    "FSenderID" : "MD_D103289979_client1",
+    "FTargetID" : "FXCM",
+    "FTargetSubID": "U100D1",
+    "FUserName" : "D103289979",
+    "FPassword" : "5020",
+    "FMsgType"  : "FIX.4.4",
+    "FDictPath" : "./support/spec/FIXFXCM10.xml",
+    "FBrokerName": "nBroker",
+    "DBHost"    : "localhost",
+    "DBDatabase": "nixfode",
+    "DBUserName": "nfuser",
+    "DBPassword": "nodefix",
+    "DBSocketPath": "/var/run/mysqld/mysqld.sock",
+    "AvgTerm"   :   "10000"        
+}
