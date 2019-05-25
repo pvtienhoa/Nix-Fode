@@ -5,11 +5,13 @@ class SpreadAvg {
         this.sum = 0.0;
         this.count = 0;
         this.avgSpread = 0.0;
+        this.lastAvg = 0.0
         this.fpoint = fpoint;
     }    
     reset() {
         this.sum = 0.0;
         this.count = 0;
+        this.lastAvg = this.avgSpread;
     };
     calculate() {
         if (this.count === 0) this.avgSpread = 0;

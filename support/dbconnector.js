@@ -80,9 +80,7 @@ class DBConnector {
             const conn = await this.pool.getConnection();
             spreadAvg.forEach(avg => {
                 avg.calculate();
-                if (avg.avgSpread != 0) {
-                    conn.query("INSERT INTO AverageSpreads(TimeStamp, Duration, BrokerName, Symbol, AvgSpread) VALUES (?, ?, ?, ?, ?)", [msgutils.getCurrentTimeStamp(), options.AvgTerm, options.FBrokerName, avg.symbol, avg.avgSpread]);
-                }
+                conn.query("INSERT INTO AverageSpreads(TimeStamp, Duration, BrokerName, Symbol, AvgSpread) VALUES (?, ?, ?, ?, ?)", [msgutils.getCurrentTimeStamp(), options.AvgTerm, options.FBrokerName, avg.symbol, avg.avgSpread == 0.0 ? avg.lastAvg : avg.avgSpread]);
             });
             conn.end();
         } catch (err) {
