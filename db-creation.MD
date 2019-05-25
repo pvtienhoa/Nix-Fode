@@ -1,10 +1,10 @@
 ## database
 
-> create database quickfix_test;
+create database quickfix_test;
  
 ## tables
 
-> use quickfix_test;
+use quickfix_test;
 
 ### livequotes
 
@@ -26,6 +26,7 @@ CREATE TABLE `Livequotes` (
 
 ### avg spreads
 
+```
 CREATE TABLE `AverageSpreads` (
   `ID` bigint(20) NOT NULL AUTO_INCREMENT,
   `TimeStamp` bigint(20) DEFAULT NULL,
@@ -37,9 +38,11 @@ CREATE TABLE `AverageSpreads` (
   KEY `idx_AverageSpread_TimeStamp` (`TimeStamp`),
   KEY `idx_AverageSpread_Symbol` (`Symbol`(20))
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+```
 
 ### symbols
 
+```
 CREATE TABLE `Symbols` (
   `ID` bigint(20) NOT NULL AUTO_INCREMENT,
   `currencypairname` longtext CHARACTER SET utf8mb4,
@@ -48,4 +51,4 @@ CREATE TABLE `Symbols` (
   `LiveQuotes` tinyint(1) DEFAULT NULL,
   PRIMARY KEY (`ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
+```
