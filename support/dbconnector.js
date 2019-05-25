@@ -4,77 +4,106 @@ const msgutils = require('./msgutils.js');
 
 class DBConnector {
     constructor(opt) {
-        this.option = {
-            host: opt.DBHost,
+        this.pool = mariadb.createPool({
+            //host: opt.DBHost,
             socketPath: opt.DBSocketPath,
             user: opt.DBUserName,
             password: opt.DBPassword,
             database: opt.DBDatabase
+        });
+    }
+    async querySymbols() {
+        debugger
+        const conn = await this.pool.getConnection();
+        const rows = await conn.query("Select * From Symbols Where LiveQuotes = ?", [1]);
+        if (rows) {
+            conn.end();
+            return rows;
         }
+        else {
+            common.showError('Cannot get rows');
+            return false;
+        };
     }
-    createPool() {
-        this.pool = mariadb.createPool(this.option);
-    }
-    querySymbols() {
-        let ret = [];
-        this.pool.getConnection()
-            .then(conn => {
-                common.showNotify("connected ! connection id is " + conn.threadId);
-                conn.query("Select * From Symbols Where LiveQuotes = '1';").then(rows => {
-                    Array.prototype.push.apply(ret, rows);
-                    debugger
-                }).catch(err => {
-                    common.showError(err);
-                });
-                conn.end();
-            })
-            .catch(err => {
-                common.showNotify("not connected due to error: " + err);
-            });
-            debugger
-        return ret;
+    async updateLiveQuotes(msgObj) {
+        common.showNotify('Trying to update Live Quotes');
+        console.log(msgObj);
+        // try {
+        //     common.showNotify('Trying to uplate Live Quotes');
+        //     console.log(msgObj);
+        //     const conn = await this.pool.getConnection();
+        //     await conn.query(`
+        // UPDATE LiveQuotesLD SET 
+        //     TimeStamp = ?, 
+        //     BrokerName = ?, 
+        //     Bid = ?, 
+        //     Ask = ?, 
+        //     Spread = ?  
+        // WHERE Symbol = ?;`,
+        //         [(msgObj.TimeStamp) ? msgObj.TimeStamp : 'TimeStamp',
+        //         (msgObj.BrokerName) ? msgObj.BrokerName : 'BrokerName',
+        //         (msgObj.Bid) ? msgObj.Bid : 'Bid',
+        //         (msgObj.Ask) ? msgObj.Ask : 'Ask',
+        //         (msgObj.Spread) ? msgObj.Spread : 'Spread',
+        //         msgObj.Symbol]);
+        //     conn.end();
+        // } catch (err) {
+        //     common.showError("not connected due to error: " + err);
+        // }
 
+
+        // this.pool.getConnection()
+        //     .then(conn => {
+        //         common.showNotify("connected ! connection id is " + conn.threadId);
+        //         conn.query(`
+        //             UPDATE LiveQuotesLD SET 
+        //                 TimeStamp = ?, 
+        //                 BrokerName = ?, 
+        //                 Bid = ?, 
+        //                 Ask = ?, 
+        //                 Spread = ?  
+        //             WHERE Symbol = ?;`,
+        //             [(msgObj.TimeStamp) ? msgObj.TimeStamp : 'TimeStamp',
+        //             (msgObj.BrokerName) ? msgObj.BrokerName : 'BrokerName',
+        //             (msgObj.Bid) ? msgObj.Bid : 'Bid',
+        //             (msgObj.Ask) ? msgObj.Ask : 'Ask',
+        //             (msgObj.Spread) ? msgObj.Spread : 'Spread',
+        //             msgObj.Symbol]).then().catch(err => {
+        //                 common.showError(err);
+        //             });
+        //         conn.end();//release to pool
+        //     }).catch(err => {
+        //         common.showError("not connected due to error: " + err);
+        //     });
     }
-    updateLiveQuotes(msgObj) {
-        this.pool.getConnection()
-            .then(conn => {
-                common.showNotify("connected ! connection id is " + conn.threadId);
-                conn.query(`
-                    UPDATE LiveQuotesLD SET 
-                        TimeStamp = ?, 
-                        BrokerName = ?, 
-                        Bid = ?, 
-                        Ask = ?, 
-                        Spread = ?  
-                    WHERE Symbol = ?;`,
-                    [(msgObj.TimeStamp) ? msgObj.TimeStamp : 'TimeStamp',
-                    (msgObj.BrokerName) ? msgObj.BrokerName : 'BrokerName',
-                    (msgObj.Bid) ? msgObj.Bid : 'Bid',
-                    (msgObj.Ask) ? msgObj.Ask : 'Ask',
-                    (msgObj.Spread) ? msgObj.Spread : 'Spread',
-                    msgObj.Symbol]).then().catch(err => {
-                        common.showError(err);
-                    });
-                conn.end();//release to pool
-            })
-            .catch(err => {
-                common.showNotify("not connected due to error: " + err);
+    async insertAvg(spreadAvg, options) {
+        try {
+            common.showNotify('Trying to insert average Quotes');
+            const conn = await this.pool.getConnection();
+            spreadAvg.forEach(avg => {
+                avg.calculate();
+                if (avg.avgSpread != 0) {
+                    conn.query("INSERT INTO AverageSpreads(TimeStamp, Duration, BrokerName, Symbol, AvgSpread) VALUES (?, ?, ?, ?, ?)", [msgutils.getCurrentTimeStamp(), options.AvgTerm, options.FBrokerName, avg.symbol, avg.avgSpread]);
+                }
             });
-    }
-    insertAvg(spreadAvg, options) {
-        this.pool.getConnection()
-            .then(conn => {
-                common.showNotify("connected ! connection id is " + conn.threadId);
-                spreadAvg.forEach(avg => {
-                    avg.calculate();
-                    if (avg.avgSpread != 0) {
-                        conn.query("INSERT INTO AverageSpreads(TimeStamp, Duration, BrokerName, Symbol, AvgSpread) VALUES (?, ?, ?, ?, ?)", [msgutils.getCurrentTimeStamp(), options.AvgTerm, options.FBrokerName, avg.symbol, avg.avgSpread]).then().catch(err => {
-                            common.showError(err);
-                        });
-                    }
-                    conn.end();//release to pool
-                });
-            })
+            conn.end();
+        } catch (err) {
+            common.showError("not connected due to error: " + err);
+        }
+
+        // this.pool.getConnection()
+        //     .then(conn => {
+        //         common.showNotify("connected ! connection id is " + conn.threadId);
+        //         spreadAvg.forEach(avg => {
+        //             avg.calculate();
+        //             if (avg.avgSpread != 0) {
+        //                 conn.query("INSERT INTO AverageSpreads(TimeStamp, Duration, BrokerName, Symbol, AvgSpread) VALUES (?, ?, ?, ?, ?)", [msgutils.getCurrentTimeStamp(), options.AvgTerm, options.FBrokerName, avg.symbol, avg.avgSpread]).then().catch(err => {
+        //                     common.showError(err);
+        //                 });
+        //             }
+        //             //conn.end();//release to pool
+        //         });
+        //     })
     }
 }
 module.exports = DBConnector;

@@ -88,19 +88,20 @@ const onLogoutHandler = (obj) => {
     //showLog(obj);
 };
 const onLogonAttempHandler = (obj) => {
-    //common.showNotify(`onLogon event Emitted`);
+    common.showNotify(`onLogon event Emitted`);
     //showLog(obj);
 };
 const toAdminHandler = (obj) => {
     //obj.message.header[57] = 'U100D1';  // Set Tag 57 - TargetSubID on hearbeat msg
-    //common.showNotify(`toAdmin event Emitted`);
-    //showLog(obj);
+    common.showNotify(`toAdmin event Emitted`);
+    showLog(obj);
 };
 const fromAdminHandler = (obj) => {
-    //common.showNotify(`fromAdmin event Emitted`);
-    //showLog(obj);
+    common.showNotify(`fromAdmin event Emitted`);
+    showLog(obj);
 };
 const fromAppHandler = (obj) => {
+    common.showNotify(`fromApp event Emitted`);
     if (obj.message) receiveMessage(obj.message);
 };
 
@@ -127,85 +128,91 @@ const receiveMessage = (message) => {
 };
 
 const recordAvg = () => {
-    dbConn.insertAvg(spreadAvg,options);    
-    common.showNotify('Average Spreads have been recorded');
-    // connection.connect(err => {
-    //     if (err) {
-    //         common.showError("not connected due to error: " + err);
-    //     } else {
-    //         common.showNotify("connected ! connection id is " + connection.threadId);
-    //         spreadAvg.forEach(avg => {
-    //             avg.calculate();
-    //             if (avg.avgSpread != 0) {
-    //                 connection.query("INSERT INTO AverageSpreads(TimeStamp, Duration, BrokerName, Symbol, AvgSpread) VALUES (?, ?, ?, ?, ?)", [msgutils.getCurrentTimeStamp(), options.AvgTerm, options.FBrokerName, avg.symbol, avg.avgSpread], (err, res) => {
-    //                     if (err) {
-    //                         common.showError("cannot query due to error:: " + err);
-    //                         return;
-    //                     }
-    //                     //console.log(res); // { affectedRows: 1, insertId: 1, warningStatus: 0 }
-    //                 });
-    //             }
-    //             // common.showNotify('This record will be insert into db');
-    //             // console.log('Symbol: ' + avg.symbol);
-    //             // console.log('duration: ' + avg.duration);
-    //             // console.log('brokerName: ' + avg.brokerName);
-    //             // console.log('avgSpread: ' + avg.avgSpread);
-    //             // console.log('sum: ' + avg.sum);
-    //             // console.log('count: ' + avg.count);
-    //             avg.reset();
-    //         });
-    //     };
-        
-    // });
+    connection.connect(err => {
+        if (err) {
+            common.showError("not connected due to error: " + err);
+        } else {
+            common.showNotify("connected ! connection id is " + connection.threadId);
+            spreadAvg.forEach(avg => {
+                avg.calculate();
+                if (avg.avgSpread != 0) {
+                    connection.query("INSERT INTO AverageSpreads(TimeStamp, Duration, BrokerName, Symbol, AvgSpread) VALUES (?, ?, ?, ?, ?)", [msgutils.getCurrentTimeStamp(), options.AvgTerm, options.FBrokerName, avg.symbol, avg.avgSpread], (err, res) => {
+                        if (err) {
+                            common.showError("cannot query due to error:: " + err);
+                            return;
+                        }
+                        //console.log(res); // { affectedRows: 1, insertId: 1, warningStatus: 0 }
+                    });
+                }
+                // common.showNotify('This record will be insert into db');
+                // console.log('Symbol: ' + avg.symbol);
+                // console.log('duration: ' + avg.duration);
+                // console.log('brokerName: ' + avg.brokerName);
+                // console.log('avgSpread: ' + avg.avgSpread);
+                // console.log('sum: ' + avg.sum);
+                // console.log('count: ' + avg.count);
+                avg.reset();
+            });
+        };
+
+    });
 
 };
 
 const sendMarktRequestData = () => {
     //Create request message template
-    var mrd = {
-        header: {
-            8: options.FMsgType,
-            35: 'V',
-            49: options.FSenderID,
-            56: options.FTargetID,
-            57: options.FTargetSubID
-        },
-        tags: {
-            262: options.BrokerName, //MDReqID
-            263: 1,                 //SubscriptionRequestType - 1:SNAPSHOT PLUS UPDATES
-            264: 0,                 //MarketDepth
-            265: 1,                 //MDUpdateType - 0: FULL REFRESH - 1:INSCREMENTAL
-        },
-        groups: [{
-            'index': 146,           //NoRelatedSym
-            'delim': 55,
-            'entries': []   //MDEntryType - 1: OFFER - 0: BID { 55: 'EUR/USD' }
-        },
-        {
-            'index': 267,
-            'delim': 269,
-            'entries': [{ 269: 0 }, { 269: 1 }]   //MDEntryType - 1: OFFER - 0: BID
-        }]
-
-    };
+    
 
     //Query Rows from Symbol tables
-    let rows = dbConn.querySymbols();
-
-    //Push Symbols into message template
-    if (rows.length > 0) {
+    debugger
+    dbConn.querySymbols().then(rows => {
+        var mrd = {
+            header: {
+                8: options.FMsgType,
+                35: 'V',
+                49: options.FSenderID,
+                56: options.FTargetID,
+                57: options.FTargetSubID
+            },
+            tags: {
+                262: options.FBrokerName, //MDReqID
+                263: 1,                 //SubscriptionRequestType - 1:SNAPSHOT PLUS UPDATES
+                264: 0,                 //MarketDepth
+                265: 1,                 //MDUpdateType - 0: FULL REFRESH - 1:INSCREMENTAL
+            },
+            groups: [{
+                'index': 146,           //NoRelatedSym
+                'delim': 55,
+                'entries': []   //MDEntryType - 1: OFFER - 0: BID { 55: 'EUR/USD' }
+            },
+            {
+                'index': 267,
+                'delim': 269,
+                'entries': [{ 269: 0 }, { 269: 1 }]   //MDEntryType - 1: OFFER - 0: BID
+            }]
+    
+        };
+        debugger
         rows.forEach(row => {
             mrd.groups[0].entries.push({ 55: row.currencypairname });
             var a = new SpreadAvg(options.FBrokerName, row.currencypairname, row.Digit);
             spreadAvg.push(a);
             //console.log(a);
         });
-    }
-    //Send message
-    fixClient.send(mrd, function () {
-        common.showNotify("Market Data Request sent!");
-        //common.printStats(fixClient);
+        fixClient.send(mrd, function () {
+            common.showNotify("Market Data Request sent!");
+            common.printStats(fixClient);
+            console.log(mrd);
+            mrd.groups.forEach(g => {
+                console.log(g);
+            });
+        });
     });
+    debugger
+    //Push Symbols into message template
+
+    //Send message
+
 
     // connection.connect(err => {
     //     if (err) {
@@ -243,7 +250,7 @@ const sendMarktRequestData = () => {
 fixClient.start(() => {
     common.showNotify("FIX Initiator Started");
     //Start connector
-    dbConn.createPool();
+    //dbConn.createPool();
 
     //set timer for record Average Spread
     setInterval(() => {
@@ -252,6 +259,7 @@ fixClient.start(() => {
 
     //Set listner on Price Received
     emitter.on('PriceReceived', (msgObj) => {
+        console.log('price received!');
         dbConn.updateLiveQuotes(msgObj);
     });
     process.stdin.resume();
