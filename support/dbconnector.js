@@ -26,30 +26,28 @@ class DBConnector {
         };
     }
     async updateLiveQuotes(msgObj) {
-        common.showNotify('Trying to update Live Quotes');
-        console.log(msgObj);
-        // try {
-        //     common.showNotify('Trying to uplate Live Quotes');
-        //     console.log(msgObj);
-        //     const conn = await this.pool.getConnection();
-        //     await conn.query(`
-        // UPDATE LiveQuotesLD SET 
-        //     TimeStamp = ?, 
-        //     BrokerName = ?, 
-        //     Bid = ?, 
-        //     Ask = ?, 
-        //     Spread = ?  
-        // WHERE Symbol = ?;`,
-        //         [(msgObj.TimeStamp) ? msgObj.TimeStamp : 'TimeStamp',
-        //         (msgObj.BrokerName) ? msgObj.BrokerName : 'BrokerName',
-        //         (msgObj.Bid) ? msgObj.Bid : 'Bid',
-        //         (msgObj.Ask) ? msgObj.Ask : 'Ask',
-        //         (msgObj.Spread) ? msgObj.Spread : 'Spread',
-        //         msgObj.Symbol]);
-        //     conn.end();
-        // } catch (err) {
-        //     common.showError("not connected due to error: " + err);
-        // }
+        try {
+            common.showNotify('Trying to update Live Quotes');
+            console.log(msgObj);
+            const conn = await this.pool.getConnection();
+            await conn.query(`
+        UPDATE LiveQuotesLD SET 
+            TimeStamp = ?, 
+            BrokerName = ?, 
+            Bid = ?, 
+            Ask = ?, 
+            Spread = ?  
+        WHERE Symbol = ?;`,
+                [(msgObj.TimeStamp) ? msgObj.TimeStamp : 'TimeStamp',
+                (msgObj.BrokerName) ? msgObj.BrokerName : 'BrokerName',
+                (msgObj.Bid) ? msgObj.Bid : 'Bid',
+                (msgObj.Ask) ? msgObj.Ask : 'Ask',
+                (msgObj.Spread) ? msgObj.Spread : 'Spread',
+                msgObj.Symbol]);
+            conn.end();
+        } catch (err) {
+            common.showError("not connected due to error: " + err);
+        }
 
 
         // this.pool.getConnection()
