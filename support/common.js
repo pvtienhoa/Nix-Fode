@@ -1,6 +1,7 @@
 const notify = require('./notify.js');
 const chalk = require('chalk');
 const fs = require('fs');
+const moment = require('moment');
 
 function stats(fixentity, sessionID, message) {
   var sess = fixentity.getSession(sessionID);
@@ -62,6 +63,11 @@ function loadFixOptions(options) {
   return ret;
 }
 
+const getTimeStamp = (timeStamp, formatStr = 'YYYYMMDD-hh:mm:ss.SSS') => {
+  if (timeStamp) return moment(timeStamp,formatStr).format("YYYYMMDDhhmmssSSS")
+  else return moment().utc().format("YYYYMMDDhhmmssSSS");
+}
+
 const showError = (message) => {
   if (message) console.log(chalk.red.bold.inverse(message));
 }
@@ -75,6 +81,7 @@ module.exports = {
   printStats,
   loadOptions,
   loadFixOptions,
+  getTimeStamp,
   showError,
   showNotify
 };

@@ -3,6 +3,7 @@ const path = require('path');
 const events = require('events');
 const initiator = quickfix.initiator;
 const mariadb = require('mariadb/callback');
+const cron = require('node-cron');
 
 const common = require('./support/common.js');
 const msgutils = require('./support/msgutils.js');
@@ -12,6 +13,7 @@ const DBConnector = require('./support/dbconnector.js');
 const optionPath = path.join(__dirname, '/support/config.json');
 debugger
 const options = common.loadOptions(optionPath);
+options.AvgTerm = 5;
 const foptions = common.loadFixOptions(options);
 
 const spreadAvg = [];
@@ -253,9 +255,14 @@ fixClient.start(() => {
     //dbConn.createPool();
 
     //set timer for record Average Spread
-    setInterval(() => {
-        recordAvg();
-    }, options.AvgTerm);
+    // setInterval(() => {
+    //     recordAvg();
+    // }, options.AvgTerm);
+
+    //cron.schedule(`*/5  * * * *`, () => {
+    cron.schedule(`*/5 * * * * *`, () => {
+        if (fixClient.isLoggedOn()) dbConn.insertAvg(spreadAvg);
+      });
 
     //Set listner on Price Received
     emitter.on('PriceReceived', (msgObj) => {

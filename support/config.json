@@ -14,5 +14,7 @@
     "DBUserName": "nfuser",
     "DBPassword": "nodefix",
     "DBSocketPath": "/var/run/mysqld/mysqld.sock",
-    "AvgTerm"   :   "10000"        
+    "TblSymbols" : "Symbols",
+    "TblLiveQuotes": "LiveQuotesLD",
+    "TblAverageSpreads": "AverageSpreads"  
 }
